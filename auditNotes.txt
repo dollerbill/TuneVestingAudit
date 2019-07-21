@@ -1,0 +1,3 @@
+
+Informational :: TuneVesting :: require(vestingDuration > 0) will never be hit because of the previous statement require(cliffDuration < vestingDuration). Uints cannot be negative so the lowest value possible for cliffDuration is 0 meaning vestingDuration can never be less than 1. 
+Low :: TuneVesting :: release() should increase value of _released after the transfer has completed incase the safeTransfer of tokens fails.
