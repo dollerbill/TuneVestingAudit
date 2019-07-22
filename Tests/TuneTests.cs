@@ -23,7 +23,7 @@ namespace Tune
 
         //bytes32 constant byteText = "HelloStackOverFlow";
 
-        private UInt256 totalSup = 1e18;
+        private UInt256 totalSup = 1e27;
         private UInt64 secondsInMonth = 2628000;
         private UInt256 monthlyVest = 1e26;
         
@@ -35,7 +35,6 @@ namespace Tune
             vestStarted = (DateTimeOffset.FromUnixTimeSeconds((long) nowTime) + TimeSpan.FromDays(1)).ToUnixTimeSeconds();
             cliffDuration = secondsInMonth * 2;
             vestingDuration = secondsInMonth * 12;
-            totalSup = 1e27;
             startTime = 1564012800;
             beneficiary = Accounts[99];
             token = await ERC20.New(Accounts[0], 1e27, RpcClient);
@@ -129,9 +128,20 @@ namespace Tune
         }
 
         [TestMethod]
-        public async Task amountVested_Return_AssertEqual()
+        public async Task amountVested_FullYearVest_AssertEqual()
         {
-            await RpcClient.IncreaseTime(secondsInMonth*24);
+            
+            await RpcClient.IncreaseTime(secondsInMonth*10);
+            await RpcClient.Mine();
+            var result = await vesting.amountVested().Call();
+            Assert.AreEqual(10*monthlyVest, result);
+        }
+
+        [TestMethod]
+        public async Task amountVested_FuVest_AssertEqual()
+        {
+            await RpcClient.IncreaseTime(secondsInMonth*3);
+            await RpcClient.Mine();
             var result = await vesting.amountVested().Call();
             Assert.AreEqual(3*monthlyVest, result);
         }
@@ -179,13 +189,6 @@ namespace Tune
         }
 
         [TestMethod]
-        public async Task release_VestTimeStampLessZero_ExpectRevert()
-        {
-            await RpcClient.IncreaseTime(secondsInMonth*3);
-            await vesting.release();
-        }
-
-        [TestMethod]
         public async Task release_AmountSendLessZero_ExpectRevert()
         {
             falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, (ulong)nowTime, cliffDuration, vestingDuration, true, 0, RpcClient);
@@ -199,7 +202,8 @@ namespace Tune
             await RpcClient.IncreaseTime(secondsInMonth*3);
             var events = await vesting.revoke().FirstOrDefaultEventLog
             <TokenVesting.TokenVestingRevoked>();
-            Assert.AreEqual(1e26, events.amount);
+            Assert.AreEqual(1e27, events.amount);
+            Assert.AreEqual(10*monthlyVest, events.amount);
         }
 
         [TestMethod]

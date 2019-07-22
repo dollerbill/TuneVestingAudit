@@ -1,3 +1,4 @@
 
-Informational :: TuneVesting :: require(vestingDuration > 0) will never be hit because of the previous statement require(cliffDuration < vestingDuration). Uints cannot be negative so the lowest value possible for cliffDuration is 0 meaning vestingDuration can never be less than 1. 
-Low :: TuneVesting :: release() should increase value of _released after the transfer has completed incase the safeTransfer of tokens fails.
+Informational :: constructor statement require(vestingDuration > 0) will never be hit because of the previous statement require(cliffDuration < vestingDuration). Uints cannot be negative so the lowest value possible for cliffDuration is 0 meaning vestingDuration can never be less than 1. 
+Informational :: release() has conditional of `if (monthlyVestTimestamp > 0)` that won't ever be hit because monthlyVestTimestamp will always be greater than zero once the cliff period has ended. 
+Low :: release() should increase value of _released after the transfer has completed incase the safeTransfer of tokens fails.
