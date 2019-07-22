@@ -11,10 +11,7 @@ namespace Tune
     public class TuneVestingTests : ContractTest
     {
         TokenVesting vesting;
-        TokenVesting falseVest;
         ERC20 token;
-        protected UInt256 vestNotStarted;
-        protected UInt256 vestStarted;
         protected UInt64 cliffDuration;
         protected UInt64 vestingDuration;
         protected UInt64 startTime;
@@ -31,8 +28,6 @@ namespace Tune
         {
             // Deploy contract.
             nowTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            vestNotStarted = (DateTimeOffset.FromUnixTimeSeconds((long) nowTime) - TimeSpan.FromDays(10)).ToUnixTimeSeconds();
-            vestStarted = (DateTimeOffset.FromUnixTimeSeconds((long) nowTime) + TimeSpan.FromDays(1)).ToUnixTimeSeconds();
             cliffDuration = secondsInMonth * 2;
             vestingDuration = secondsInMonth * 12;
             startTime = 1564012800;
@@ -154,14 +149,6 @@ namespace Tune
         }
 
         [TestMethod]
-        public async Task revocable_Return_AssertFalse()
-        {
-            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
-            var result = await falseVest.revocable().Call();
-            Assert.AreEqual(false, result);
-        }
-
-        [TestMethod]
         public async Task revoked_NotRevoked_AssertBool()
         {
             await RpcClient.IncreaseTime(secondsInMonth*8);
@@ -189,14 +176,6 @@ namespace Tune
         }
 
         [TestMethod]
-        public async Task release_AmountSendLessZero_ExpectRevert()
-        {
-            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, (ulong)nowTime, cliffDuration, vestingDuration, true, 0, RpcClient);
-            await RpcClient.IncreaseTime(secondsInMonth*7);
-            await falseVest.release().ExpectRevertTransaction();
-        }
-
-        [TestMethod]
         public async Task revoke_Revoked_EmitEvent()
         {
             await RpcClient.IncreaseTime(secondsInMonth*3);
@@ -211,13 +190,6 @@ namespace Tune
         {
             await RpcClient.IncreaseTime(36792000);
             await vesting.revoke().ExpectRevertTransaction();
-        }
-
-        [TestMethod]
-        public async Task revoke_NotRevocable_ExpectRevert()
-        {
-            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
-            await falseVest.revoke().ExpectRevertTransaction();
         }
 
         [TestMethod]
@@ -332,6 +304,51 @@ namespace Tune
         {
             await token.decreaseAllowance(Address.Zero, 500).ExpectRevertTransaction();
         }
+    }
+    [TestClass]
+    public class MultiTests : ContractTest
+    {
+        TokenVesting vesting;
+        TokenVesting falseVest;
+        TokenVesting thirdVest;
+        ERC20 token;
+        protected UInt64 cliffDuration;
+        protected UInt64 vestingDuration;
+        protected UInt64 startTime;
+        protected UInt256 nowTime;
+
+        //bytes32 constant byteText = "HelloStackOverFlow";
+
+        private UInt256 totalSup = 1e27;
+        private UInt64 secondsInMonth = 2628000;
+        private UInt256 monthlyVest = 1e26;
+        
+        protected override async Task BeforeEach()
+        {
+            // Deploy contract.
+            nowTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            cliffDuration = secondsInMonth * 2;
+            vestingDuration = secondsInMonth * 12;
+            startTime = 1564012800;
+            token = await ERC20.New(Accounts[0], 1e27, RpcClient);
+            vesting = await TokenVesting.New(Accounts[25], token.ContractAddress, (ulong)nowTime, cliffDuration, vestingDuration, true, totalSup, RpcClient);
+        }
+
+        [TestMethod]
+        public async Task release_MultipleVests_AssertBalances()
+        {
+            falseVest = await TokenVesting.New(Accounts[50], token.ContractAddress,
+             (ulong)nowTime, cliffDuration, vestingDuration, true, totalSup, RpcClient);
+            thirdVest = await TokenVesting.New(Accounts[75], token.ContractAddress,
+             (ulong)nowTime, cliffDuration, vestingDuration, true, totalSup, RpcClient);
+            await token.transfer(Accounts[17], 1e9);
+            await token.transfer(Accounts[34], 1e9);
+            await token.transfer(vesting.ContractAddress, 1e9);
+            await token.transfer(vesting.ContractAddress, 1e9).SendTransaction 
+             (new TransactionParams { From = Accounts[17]});
+            await token.transfer(vesting.ContractAddress, 1e9).SendTransaction 
+             (new TransactionParams { From = Accounts[34]});
+        }
 
         [TestMethod]
         public async Task safeTransfer_FailedTransfer_ExpectRevert()
@@ -339,6 +356,29 @@ namespace Tune
             falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, true, totalSup, RpcClient);
             await RpcClient.IncreaseTime(secondsInMonth*24);
             await falseVest.release().ExpectRevertTransaction();
+        }
+
+        [TestMethod]
+        public async Task revocable_Return_AssertFalse()
+        {
+            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
+            var result = await falseVest.revocable().Call();
+            Assert.AreEqual(false, result);
+        }
+
+        [TestMethod]
+        public async Task release_AmountSendLessZero_ExpectRevert()
+        {
+            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, (ulong)nowTime, cliffDuration, vestingDuration, true, 0, RpcClient);
+            await RpcClient.IncreaseTime(secondsInMonth*7);
+            await falseVest.release().ExpectRevertTransaction();
+        }
+
+        [TestMethod]
+        public async Task revoke_NotRevocable_ExpectRevert()
+        {
+            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
+            await falseVest.revoke().ExpectRevertTransaction();
         }
     }
 }
