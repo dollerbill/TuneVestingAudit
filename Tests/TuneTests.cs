@@ -73,12 +73,6 @@ namespace Tune
             await TokenVesting.New(beneficiary, token.ContractAddress, startTime, 2627999, 2628001, true, totalSup, RpcClient).ExpectRevert();
         }
 
-        // [TestMethod] // never hit with even releasingMonths?
-        // public async Task constructor_TotalTokensReleaseMonthsModZero_ExpectRevert()
-        // {
-        //     await TokenVesting.New(beneficiary, token.ContractAddress, startTime, 2627998, 7883997, true, totalSup, RpcClient).ExpectRevert();
-        // }
-
         [TestMethod]
         public async Task beneficiary_Return_AssertEqual()
         {
@@ -200,12 +194,12 @@ namespace Tune
             await vesting.revoke().ExpectRevertTransaction();
         }
 
-        [TestMethod]
-        public async Task revoke_NotVested_ExpectRevert()
-        {
-            await RpcClient.IncreaseTime(secondsInMonth*2);
-            await vesting.revoke();
-        }
+//        [TestMethod]
+//        public async Task revoke_NotVested_ExpectRevert()
+//        {
+//            await RpcClient.IncreaseTime(secondsInMonth*2);
+//            await vesting.revoke();
+//        }
 
         [TestMethod]
         public async Task revoke_CliffNotStarted_ExpectRevert()
@@ -353,7 +347,7 @@ namespace Tune
         [TestMethod]
         public async Task safeTransfer_FailedTransfer_ExpectRevert()
         {
-            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, true, totalSup, RpcClient);
+            falseVest = await TokenVesting.New(Accounts[78], token.ContractAddress, startTime, cliffDuration, vestingDuration, true, totalSup, RpcClient);
             await RpcClient.IncreaseTime(secondsInMonth*24);
             await falseVest.release().ExpectRevertTransaction();
         }
@@ -361,7 +355,7 @@ namespace Tune
         [TestMethod]
         public async Task revocable_Return_AssertFalse()
         {
-            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
+            falseVest = await TokenVesting.New(Accounts[78], token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
             var result = await falseVest.revocable().Call();
             Assert.AreEqual(false, result);
         }
@@ -369,7 +363,7 @@ namespace Tune
         [TestMethod]
         public async Task release_AmountSendLessZero_ExpectRevert()
         {
-            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, (ulong)nowTime, cliffDuration, vestingDuration, true, 0, RpcClient);
+            falseVest = await TokenVesting.New(Accounts[78], token.ContractAddress, (ulong)nowTime, cliffDuration, vestingDuration, true, 0, RpcClient);
             await RpcClient.IncreaseTime(secondsInMonth*7);
             await falseVest.release().ExpectRevertTransaction();
         }
@@ -377,8 +371,17 @@ namespace Tune
         [TestMethod]
         public async Task revoke_NotRevocable_ExpectRevert()
         {
-            falseVest = await TokenVesting.New(beneficiary, token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
+            falseVest = await TokenVesting.New(Accounts[78], token.ContractAddress, startTime, cliffDuration, vestingDuration, false, totalSup, RpcClient);
             await falseVest.revoke().ExpectRevertTransaction();
+        }
+        
+        [TestMethod]
+        public async Task transferFrom_Approved_AssertBalance()
+        {
+            await token.approve(Accounts[16], 5000);
+            await token.transferFrom(Accounts[0], Accounts[16], 5000).SendTransaction(new TransactionParams {From = Accounts[16]});
+            var bal = await token.balanceOf(Accounts[16]).Call();
+            Assert.AreEqual(5000, bal);
         }
     }
 }
