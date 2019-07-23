@@ -123,16 +123,16 @@ namespace Tune
             await RpcClient.IncreaseTime(secondsInMonth*10);
             await RpcClient.Mine();
             var result = await vesting.amountVested().Call();
-            Assert.AreEqual(10*monthlyVest, result);
+            Assert.AreEqual(8*monthlyVest, result);
         }
 
         [TestMethod]
-        public async Task amountVested_FuVest_AssertEqual()
+        public async Task amountVested_PastCliff_AssertEqual()
         {
             await RpcClient.IncreaseTime(secondsInMonth*3);
             await RpcClient.Mine();
             var result = await vesting.amountVested().Call();
-            Assert.AreEqual(3*monthlyVest, result);
+            Assert.AreEqual(monthlyVest, result);
         }
         
         [TestMethod]
@@ -193,13 +193,6 @@ namespace Tune
             await vesting.revoke();
             await vesting.revoke().ExpectRevertTransaction();
         }
-
-//        [TestMethod]
-//        public async Task revoke_NotVested_ExpectRevert()
-//        {
-//            await RpcClient.IncreaseTime(secondsInMonth*2);
-//            await vesting.revoke();
-//        }
 
         [TestMethod]
         public async Task revoke_CliffNotStarted_ExpectRevert()
@@ -327,7 +320,7 @@ namespace Tune
         }
 
         [TestMethod]
-        public async Task release_MultipleVests_AssertBalances()
+        public async Task release_MultipleSameVests_AssertBalances()
         {
           secondVest = await TokenVesting.New(Accounts[35], secondToken.ContractAddress,
              (ulong)nowTime, cliffDuration, vestingDuration, true, totalSup, RpcClient);
@@ -336,26 +329,89 @@ namespace Tune
             await token.transfer(vesting.ContractAddress, totalSup);
             await secondToken.transfer(secondVest.ContractAddress, totalSup);
             await thirdToken.transfer(thirdVest.ContractAddress, totalSup);
+            //vest
+            await RpcClient.IncreaseTime(secondsInMonth*12);
+            await vesting.release();
+            await secondVest.release();
+            await thirdVest.release();
+            //balances after distribution
+            var bal = await token.balanceOf(Accounts[25]).Call();
+            var balSecond = await secondToken.balanceOf(Accounts[35]).Call();
+            var balThird = await thirdToken.balanceOf(Accounts[45]).Call();
+            Assert.AreEqual(10*monthlyVest, bal);
+            Assert.AreEqual(10*monthlyVest, balSecond);
+            Assert.AreEqual(10*monthlyVest, balThird);
+        }
 
-             /*
-             * vesting
-             */
+        [TestMethod]
+        public async Task release_differentVests_AssertBalances()
+        {
+          secondVest = await TokenVesting.New(Accounts[35], secondToken.ContractAddress,
+             (ulong)nowTime, secondsInMonth*11, vestingDuration, true, totalSup, RpcClient);
+            thirdVest = await TokenVesting.New(Accounts[45], thirdToken.ContractAddress,
+             (ulong)nowTime, 0, secondsInMonth*20, true, totalSup, RpcClient);
+            await token.transfer(vesting.ContractAddress, totalSup);
+            await secondToken.transfer(secondVest.ContractAddress, totalSup);
+            await thirdToken.transfer(thirdVest.ContractAddress, totalSup);
+            //vest
+            await RpcClient.IncreaseTime(secondsInMonth*6);
+            await vesting.release();
+            await thirdVest.release();
+            //balances after distribution, third account monthlyVest will be div 2 
+            var bal = await token.balanceOf(Accounts[25]).Call();
+            var balSecond = await secondToken.balanceOf(Accounts[35]).Call();
+            var balThird = await thirdToken.balanceOf(Accounts[45]).Call();
+            Assert.AreEqual(4*monthlyVest, bal);
+            Assert.AreEqual(0*monthlyVest, balSecond);
+            Assert.AreEqual(3*monthlyVest, balThird);
+            //balances after vesting second round
+            await RpcClient.IncreaseTime(secondsInMonth*14);
+            await vesting.release();
+            await secondVest.release();
+            await thirdVest.release();
+            bal = await token.balanceOf(Accounts[25]).Call();
+            Assert.AreEqual(10*monthlyVest, bal);
+            balSecond = await secondToken.balanceOf(Accounts[35]).Call();
+            Assert.AreEqual(10*monthlyVest, balSecond);
+            balThird = await thirdToken.balanceOf(Accounts[45]).Call();
+            Assert.AreEqual(10*monthlyVest, balThird);
+        }
 
-             await RpcClient.IncreaseTime(secondsInMonth*12);
-             await vesting.release();
-             await secondVest.release();
-             await thirdVest.release();
-
-             /*
-              * balances after distribution
-              */
-
-             var bal25 = await token.balanceOf(Accounts[25]).Call();
-             var bal35 = await secondToken.balanceOf(Accounts[35]).Call();
-             var bal45 = await thirdToken.balanceOf(Accounts[45]).Call();
-             Assert.AreEqual(10*monthlyVest, bal25);
-             Assert.AreEqual(10*monthlyVest, bal35);
-             Assert.AreEqual(10*monthlyVest, bal45);
+        [TestMethod]
+        public async Task release_timedVests_AssertBalances()
+        {
+          secondVest = await TokenVesting.New(Accounts[35], secondToken.ContractAddress,
+             (ulong)nowTime+secondsInMonth, cliffDuration, vestingDuration, true, totalSup, RpcClient);
+            thirdVest = await TokenVesting.New(Accounts[45], thirdToken.ContractAddress,
+             (ulong)nowTime+secondsInMonth*3, cliffDuration, vestingDuration, true, totalSup, RpcClient);
+            await token.transfer(vesting.ContractAddress, totalSup);
+            await secondToken.transfer(secondVest.ContractAddress, totalSup);
+            await thirdToken.transfer(thirdVest.ContractAddress, totalSup);
+            //vest
+            await RpcClient.IncreaseTime(secondsInMonth*12);
+            await vesting.release();
+            await secondVest.release();
+            await thirdVest.release();
+            //balances after first 12 months
+            var bal = await token.balanceOf(Accounts[25]).Call();
+            var balSecond = await secondToken.balanceOf(Accounts[35]).Call();
+            var balThird = await thirdToken.balanceOf(Accounts[45]).Call();
+            Assert.AreEqual(10*monthlyVest, bal);
+            Assert.AreEqual(9*monthlyVest, balSecond);
+            Assert.AreEqual(7*monthlyVest, balThird);
+            //balances after vesting second round
+            await RpcClient.IncreaseTime(secondsInMonth);
+            await secondVest.release();
+            await thirdVest.release();
+            balSecond = await secondToken.balanceOf(Accounts[35]).Call();
+            Assert.AreEqual(10*monthlyVest, balSecond);
+            balThird = await thirdToken.balanceOf(Accounts[45]).Call();
+            Assert.AreEqual(8*monthlyVest, balThird);
+            //balances after vesting third round
+            await RpcClient.IncreaseTime(secondsInMonth*2);
+            await thirdVest.release();
+            balThird = await thirdToken.balanceOf(Accounts[45]).Call();
+            Assert.AreEqual(10*monthlyVest, balThird);
         }
 
         [TestMethod]
