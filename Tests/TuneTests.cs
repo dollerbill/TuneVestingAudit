@@ -195,9 +195,22 @@ namespace Tune
         }
 
         [TestMethod]
-        public async Task revoke_CliffNotStarted_ExpectRevert()
+        public async Task revoke_RevokeImmediately_AssertBalances()
         {
-            await vesting.revoke().ExpectRevertTransaction();
+            var bal = await token.balanceOf(Accounts[0]).Call();
+            Assert.AreEqual(0, bal);
+            var events = await vesting.revoke().FirstEventLog<TokenVesting.TokenVestingRevoked>();
+            Assert.AreEqual(10*monthlyVest, events.amount);
+            bal = await token.balanceOf(Accounts[0]).Call();
+            Assert.AreEqual(events.amount, bal);
+        }
+ 
+        [TestMethod]
+        public async Task revoke_BeforeCliff_EmitEvent()
+        {
+            await RpcClient.IncreaseTime(secondsInMonth);
+            var events = await vesting.revoke().FirstEventLog<TokenVesting.TokenVestingRevoked>();
+            Assert.AreEqual(10*monthlyVest, events.amount);
         }
 
         [TestMethod]
